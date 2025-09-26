@@ -17,8 +17,53 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
 ### Prerequisites
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL database)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL database and dev containers)
 - [Git](https://git-scm.com/)
+- [Visual Studio Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (optional but recommended)
+
+## Development Options
+
+You can develop this project either **locally** or in a **dev container**. The dev container provides a consistent, isolated environment with all dependencies pre-configured.
+
+### Option 1: Dev Container Setup (Recommended)
+
+The easiest way to get started is using the provided dev container configuration:
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/Gheard21/Bloggit.git
+   cd Bloggit
+   ```
+
+2. **Open in Dev Container**
+   - Open the project in VS Code
+   - When prompted, click "Reopen in Container"
+   - Or use Command Palette: `Dev Containers: Reopen in Container`
+
+3. **Start Development**
+   ```bash
+   # Database is already running in the container
+   # Connection string is pre-configured via environment variables
+   
+   # Run migrations
+   dotnet ef database update --project App/Posts/Infrastructure --startup-project App/Posts/Api
+   
+   # Start the API
+   dotnet run --project App/Posts/Api
+   ```
+   
+   **Note:** No manual database setup or connection string configuration needed! Everything is pre-configured in the dev container.
+
+The dev container includes:
+- ✅ .NET 9 SDK pre-installed
+- ✅ PostgreSQL database automatically configured
+- ✅ EF Core tools ready to use
+- ✅ Docker support for Testcontainers
+- ✅ VS Code extensions pre-configured
+- ✅ Automatic NuGet package caching
+- ✅ Port forwarding (API: 5000/5001, PostgreSQL: 5432)
+
+### Option 2: Local Setup
 
 ### Quick Start
 
@@ -170,6 +215,11 @@ You can test the endpoints using:
 **Integration Test Issues:**
 - Ensure Docker Desktop is running (required for Testcontainers)
 - Tests may take longer on first run while downloading PostgreSQL image
+
+**Dev Container Issues:**
+- Ensure Docker Desktop is running before opening in VS Code
+- If container fails to start, try rebuilding: Command Palette → `Dev Containers: Rebuild Container`
+- Check Docker has sufficient resources allocated (8GB RAM recommended)
 
 ### Contributing
 

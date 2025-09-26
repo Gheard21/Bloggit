@@ -32,6 +32,11 @@ Example: `Bloggit.App.Posts.Infrastructure.Repositories`
 
 ## Critical Development Workflows
 
+### Development Environment Options
+- **Dev Container**: Recommended approach with `.devcontainer/` configuration providing isolated environment
+- **Local Setup**: Traditional approach requiring local .NET 9 SDK and PostgreSQL via Docker Compose
+- **Container Benefits**: Pre-configured PostgreSQL, EF tools, Docker-in-Docker for Testcontainers, VS Code extensions
+
 ### Building & Testing
 - **Solution Location**: Use `Solutions/Posts.sln/Posts.sln` (note the nested directory structure)
 - **Integration Tests**: Require Docker for Testcontainers PostgreSQL
@@ -121,3 +126,17 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture)
 - Use primary constructor to inject fixture
 - Call `CreateContext()` within `await using` blocks
 - Tests automatically have seeded data available
+
+## Dev Container Configuration
+
+### Container Stack
+- **Base Image**: `mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm`
+- **Database**: PostgreSQL 16 Alpine with volume persistence
+- **Tools**: EF Core CLI, Docker Compose, PostgreSQL client pre-installed
+- **VS Code**: Extensions for C# Dev Kit, Docker, REST Client automatically configured
+
+### Container Database Setup
+- **Dev Database**: `bloggit_dev` with `bloggit_user:bloggit_password`
+- **Test Database**: `bloggit_test` (auto-created for integration tests)
+- **Connection String**: Pre-configured via environment variables
+- **Port Forwarding**: 5000/5001 (API), 5432 (PostgreSQL) automatically forwarded

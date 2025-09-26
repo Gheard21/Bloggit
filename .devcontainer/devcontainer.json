@@ -1,0 +1,56 @@
+{
+    "name": "Bloggit - .NET 9 with PostgreSQL",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "app",
+    "workspaceFolder": "/workspace",
+    "shutdownAction": "stopCompose",
+    
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    },
+    
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csharp",
+                "ms-dotnettools.csdevkit",
+                "ms-vscode.vscode-json",
+                "ms-azuretools.vscode-docker",
+                "ms-vscode-remote.remote-containers",
+                "bradlc.vscode-tailwindcss",
+                "formulahendry.dotnet-test-explorer",
+                "humao.rest-client"
+            ],
+            "settings": {
+                "dotnet.defaultSolution": "./Solutions/Posts.sln/Posts.sln",
+                "files.exclude": {
+                    "**/bin": true,
+                    "**/obj": true
+                }
+            }
+        }
+    },
+    
+    "forwardPorts": [5000, 5001, 5432],
+    "portsAttributes": {
+        "5000": {
+            "label": "Web HTTP",
+            "onAutoForward": "notify"
+        },
+        "5001": {
+            "label": "Web HTTPS",
+            "onAutoForward": "notify"
+        },
+        "5432": {
+            "label": "PostgreSQL",
+            "onAutoForward": "silent"
+        }
+    },
+    
+    "postCreateCommand": "dotnet restore ./Solutions/Posts.sln/Posts.sln",
+    "postStartCommand": "docker-compose -f .devcontainer/docker-compose.yml up -d postgres",
+    
+    "mounts": [
+        "source=bloggit-nuget-cache,target=/home/vscode/.nuget,type=volume"
+    ]
+}
