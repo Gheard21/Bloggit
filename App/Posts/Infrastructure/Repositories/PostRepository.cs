@@ -29,11 +29,9 @@ public class PostRepository(DataContext dataContext) : IPostRepository
     public async Task<PostEntity?> GetByIdAsync(Guid id) =>
         await _dataContext.Posts.FindAsync(id);
 
-    public async Task Update(PostEntity updatedPost)
-    {
-        _dataContext.Posts.Update(updatedPost);
-        await SaveChangesAsync();
-    }
+    public void Update(PostEntity updatedPost)
+        => _dataContext.Posts.Update(updatedPost);
+    
 
     public async Task SaveChangesAsync() =>
         await _dataContext.SaveChangesAsync();

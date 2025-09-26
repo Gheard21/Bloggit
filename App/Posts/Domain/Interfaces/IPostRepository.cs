@@ -9,6 +9,6 @@ public interface IPostRepository
     Task Delete(PostEntity post);
     void Remove(PostEntity post);
     Task<PostEntity?> GetByIdAsync(Guid id);
-    Task Update(PostEntity updatedPost);
+    void Update(PostEntity updatedPost);
     Task SaveChangesAsync();
 }

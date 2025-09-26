@@ -105,7 +105,7 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture) : ICl
         post.Content = "Updated Content";
 
         // Act
-        await repository.Update(post);
+        repository.Update(post);
 
         // Assert
         var updatedPost = await context.Posts.FindAsync(post.Id);

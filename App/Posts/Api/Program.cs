@@ -1,41 +1,90 @@
+using Bloggit.App.Posts.Application.Mappings;
+using Bloggit.App.Posts.Application.Requests;
+using Bloggit.App.Posts.Domain.Interfaces;
+using Bloggit.App.Posts.Infrastructure;
+using Bloggit.App.Posts.Infrastructure.Repositories;
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddDbContext<DataContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IPostRepository, PostRepository>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
-{
     app.MapOpenApi();
-}
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+var posts = app.MapGroup("/api/admin/posts");
 
-app.MapGet("/weatherforecast", () =>
+posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    var post = await postRepository.GetByIdAsync(postId);
+
+    if (post is null)
+        return Results.NotFound();
+
+    postRepository.Remove(post);
+    await postRepository.SaveChangesAsync();
+
+    return Results.NoContent();
 })
-.WithName("GetWeatherForecast");
+.WithName("DeletePosts");
+
+posts.MapGet("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
+{
+    var post = await postRepository.GetByIdAsync(postId);
+
+    if (post is null)
+        return Results.NotFound();
+
+    var response = post.ToResponse();
+
+    return Results.Ok(response);
+})
+.WithName("GetPost");
+
+posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository postRepository, IValidator<NewPostRequest> validator) =>
+{
+    var validationResult = await validator.ValidateAsync(request);
+
+    if (!validationResult.IsValid)
+        return Results.BadRequest();
+
+    var entity = request.ToEntity();
+
+    await postRepository.AddAsync(entity);
+    await postRepository.SaveChangesAsync();
+
+    var response = entity.ToResponse();
+
+    return Results.CreatedAtRoute("GetPost", new { postId = response.Id }, response);
+})
+.WithName("CreatePost");
+
+posts.MapPatch("{postId:guid}", async (Guid postId, [FromBody] UpdatePostRequest request, IPostRepository postRepository, IValidator<UpdatePostRequest> validator) =>
+{
+    var validationResult = validator.Validate(request);
+
+    if (!validationResult.IsValid)
+        return Results.BadRequest();
+
+    var entity = request.ToEntity();
+
+    postRepository.Update(entity);
+    await postRepository.SaveChangesAsync();
+
+    return Results.Ok();
+})
+.WithName("UpdatePost");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

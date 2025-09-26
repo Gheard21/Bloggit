@@ -27,24 +27,35 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
    POSTGRES_DB=bloggitdb
    ```
 
-3. **Start the Database**
+3. **Configure API Database Connection**
+   
+   Set up the database connection string as a user secret:
+   ```bash
+   cd App/Posts/Api
+   dotnet user-secrets init
+   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=bloggitdb;Username=bloggit;Password=your_secure_password"
+   ```
+   
+   > **Note:** Replace `your_secure_password` with the same password you used in the `.env` file above.
+
+4. **Start the Database**
    ```bash
    docker-compose up -d
    ```
 
-4. **Build the Solution**
+5. **Build the Solution**
    ```bash
    cd Solutions/Posts.sln
    dotnet build
    ```
 
-5. **Run Database Migrations**
+6. **Run Database Migrations**
    ```bash
    cd ../../App/Posts/Infrastructure
    dotnet ef database update --project . --startup-project ../Api
    ```
 
-6. **Start the API**
+7. **Start the API**
    ```bash
    cd ../Api
    dotnet run
