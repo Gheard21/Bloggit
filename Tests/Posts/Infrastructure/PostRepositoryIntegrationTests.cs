@@ -1,6 +1,7 @@
 using Bloggit.App.Posts.Domain.Entities;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.App.Posts.Infrastructure.Repositories;
+using Bloggit.Tests.Posts.Shared;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

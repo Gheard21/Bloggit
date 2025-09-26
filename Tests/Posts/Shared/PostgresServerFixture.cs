@@ -1,10 +1,11 @@
-﻿
+
 using Bloggit.App.Posts.Domain.Entities;
 using Bloggit.App.Posts.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
+using Xunit;
 
-namespace Bloggit.Tests.Posts.Infrastructure;
+namespace Bloggit.Tests.Posts.Shared;
 
 public class PostgresServerFixture : IAsyncLifetime
 {
