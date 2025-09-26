@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Bloggit.Tests.Posts.Infrastructure;
 
+[Trait("Category", "Integration")]
 public class PostRepositoryIntegrationTests(PostgresServerFixture fixture) : IClassFixture<PostgresServerFixture>
 {
     private readonly PostgresServerFixture _fixture = fixture;
