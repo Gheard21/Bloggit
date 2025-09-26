@@ -1,4 +1,6 @@
-﻿namespace Bloggit.Tests.Posts.Api;
+﻿using Xunit;
+
+namespace Bloggit.Tests.Posts.Api;
 
 public class UnitTest1
 {

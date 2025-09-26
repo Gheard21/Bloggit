@@ -1,4 +1,6 @@
-﻿namespace Bloggit.Tests.Posts.Domain;
+﻿using Xunit;
+
+namespace Bloggit.Tests.Posts.Domain;
 
 public class UnitTest1
 {
