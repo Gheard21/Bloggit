@@ -26,7 +26,9 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection when not in testing environment
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseHttpsRedirection();
 
 var posts = app.MapGroup("/api/admin/posts");
 
@@ -66,10 +68,9 @@ posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository post
 
     var entity = request.ToEntity();
 
-    await postRepository.AddAsync(entity);
-    await postRepository.SaveChangesAsync();
+    var createdEntity = await postRepository.AddAsync(entity);
 
-    var response = entity.ToResponse();
+    var response = createdEntity.ToResponse();
 
     return Results.CreatedAtRoute("GetPost", new { postId = response.Id }, response);
 })
@@ -98,3 +99,6 @@ posts.MapPatch("{postId:guid}", async (Guid postId, [FromBody] UpdatePostRequest
 .WithName("UpdatePost");
 
 app.Run();
+
+// Make Program class accessible for integration testing
+public partial class Program { }

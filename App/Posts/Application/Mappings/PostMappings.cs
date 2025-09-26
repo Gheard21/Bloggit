@@ -11,8 +11,10 @@ public static class PostMappings
     {
         return new PostEntity
         {
+            Id = Guid.NewGuid(),
             Title = request.Title,
             Content = request.Content,
+            AuthorId = "System", // TODO: Get from authentication context
         };
     }
 
