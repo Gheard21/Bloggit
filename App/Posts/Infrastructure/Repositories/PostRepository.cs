@@ -9,8 +9,7 @@ public class PostRepository(DataContext dataContext) : IPostRepository
 
     public async Task<PostEntity> AddAsync(PostEntity post)
     {
-        _dataContext.Posts.Add(post);
-        await SaveChangesAsync();
+        await _dataContext.Posts.AddAsync(post);
         return post;
     }
 

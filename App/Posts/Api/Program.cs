@@ -1,5 +1,6 @@
 using Bloggit.App.Posts.Application.Mappings;
 using Bloggit.App.Posts.Application.Requests;
+using Bloggit.App.Posts.Application.Validators;
 using Bloggit.App.Posts.Domain.Interfaces;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.App.Posts.Infrastructure.Repositories;
@@ -13,6 +14,9 @@ builder.Services.AddDbContext<DataContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IPostRepository, PostRepository>();
+
+builder.Services.AddScoped<IValidator<NewPostRequest>, NewPostRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdatePostRequest>, UpdatePostRequestValidator>();
 
 builder.Services.AddOpenApi();
 
@@ -38,7 +42,7 @@ posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postReposit
 
     return Results.NoContent();
 })
-.WithName("DeletePosts");
+.WithName("DeletePost");
 
 posts.MapGet("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
 {
@@ -73,14 +77,20 @@ posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository post
 
 posts.MapPatch("{postId:guid}", async (Guid postId, [FromBody] UpdatePostRequest request, IPostRepository postRepository, IValidator<UpdatePostRequest> validator) =>
 {
-    var validationResult = validator.Validate(request);
+    var validationResult = await validator.ValidateAsync(request);
 
     if (!validationResult.IsValid)
         return Results.BadRequest();
 
-    var entity = request.ToEntity();
+    var existingPost = await postRepository.GetByIdAsync(postId);
 
-    postRepository.Update(entity);
+    if (existingPost is null)
+        return Results.NotFound();
+
+    existingPost.Title = request.Title;
+    existingPost.Content = request.Content;
+
+    postRepository.Update(existingPost);
     await postRepository.SaveChangesAsync();
 
     return Results.Ok();

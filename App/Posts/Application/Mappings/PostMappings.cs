@@ -16,15 +16,6 @@ public static class PostMappings
         };
     }
 
-    public static PostEntity ToEntity(this UpdatePostRequest request)
-    {
-        return new PostEntity
-        {
-            Title = request.Title,
-            Content = request.Content,
-        };
-    }
-
     public static PostResponse ToResponse(this PostEntity request)
     {
         return new PostResponse
