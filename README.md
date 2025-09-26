@@ -2,6 +2,16 @@
 
 A modern blogging platform built with .NET 9, implementing Clean Architecture with vertical slice organization.
 
+## Key Features
+
+- **Clean Architecture**: Strict layer separation with Domain, Application, Infrastructure, and API layers
+- **Vertical Slice Organization**: Each feature (Posts) has its own isolated stack
+- **Minimal APIs**: Direct endpoint mapping with grouped routes
+- **Entity Framework Core 9**: PostgreSQL database with code-first migrations  
+- **Testcontainers Integration**: Real database testing with Docker
+- **FluentValidation**: Request validation matching EF constraints
+- **Primary Constructor Pattern**: Modern C# 12 syntax throughout
+
 ## Local Development Setup
 
 ### Prerequisites
@@ -64,6 +74,7 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
    The API will be available at:
    - HTTP: `http://localhost:5180`
    - HTTPS: `https://localhost:7019`
+   - OpenAPI spec: `https://localhost:7019/openapi/v1.json` (development only)
 
 ### Development Workflow
 
@@ -103,6 +114,8 @@ dotnet test --filter "Category=Integration"
 dotnet test
 ```
 
+> **Note:** Integration tests automatically spin up PostgreSQL containers via Testcontainers and seed test data.
+
 #### Project Structure
 
 The solution follows Clean Architecture with vertical slices:
@@ -123,27 +136,40 @@ Tests/Posts/
 
 ### API Usage
 
-The API provides RESTful endpoints for blog post management. You can test the endpoints using:
+The API provides RESTful endpoints for blog post management under `/api/admin/posts`:
 
-- **HTTP Client**: Use the included `Bloggit.App.Posts.Api.http` file with VS Code REST Client extension
-- **Postman/Insomnia**: Import the API endpoints
-- **Swagger**: Available at `https://localhost:7019/swagger` (when running in development)
+- `GET /api/admin/posts/{postId}` - Retrieve a specific post
+- `POST /api/admin/posts` - Create a new post
+- `PATCH /api/admin/posts/{postId}` - Update an existing post
+- `DELETE /api/admin/posts/{postId}` - Delete a post
+
+You can test the endpoints using:
+
+- **HTTP Client**: Use the VS Code REST Client extension (sample requests in `Bloggit.App.Posts.Api.http`)
+- **OpenAPI Spec**: Download from `https://localhost:7019/openapi/v1.json` (development only)
+- **Postman/Insomnia**: Import the OpenAPI specification
+- **curl**: Direct HTTP requests to the endpoints
 
 ### Troubleshooting
 
 **Database Connection Issues:**
-- Ensure Docker is running and the PostgreSQL container is healthy
+- Ensure Docker is running and the PostgreSQL container is healthy: `docker ps`
 - Check the `.env` file has correct database credentials
-- Verify the connection string in `appsettings.json`
+- Verify the connection string is set via user secrets: `dotnet user-secrets list`
 
 **Migration Issues:**
 - Ensure you're running migrations from the `Infrastructure` project directory
-- Check that the startup project is correctly set to `../Api`
-- Verify the database is running and accessible
+- Use full command: `dotnet ef database update --project . --startup-project ../Api`
+- Check EF tools are installed: `dotnet tool list -g`
 
 **Port Conflicts:**
 - Default ports are 5180 (HTTP) and 7019 (HTTPS)
-- Modify `launchSettings.json` if these ports are in use
+- Modify `Properties/launchSettings.json` if these ports are in use
+- Check for running processes: `netstat -ano | findstr :5180`
+
+**Integration Test Issues:**
+- Ensure Docker Desktop is running (required for Testcontainers)
+- Tests may take longer on first run while downloading PostgreSQL image
 
 ### Contributing
 

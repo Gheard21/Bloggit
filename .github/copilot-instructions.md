@@ -14,6 +14,7 @@ Domain (Core) -> Application (Use Cases) -> Infrastructure (Data) <- Api (Presen
 - **Entity Framework Primary Constructor Pattern**: `DataContext(DbContextOptions<DataContext> options) : DbContext(options)`
 - **Repository with Dual Methods**: Both async (`AddAsync`) and sync (`Add`) versions for different usage patterns
 - **Testcontainers Integration**: Real PostgreSQL database for integration tests
+- **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`)
 
 ## Project Structure & Naming
 
@@ -32,14 +33,15 @@ Example: `Bloggit.App.Posts.Infrastructure.Repositories`
 ## Critical Development Workflows
 
 ### Building & Testing
-- **Solution Location**: Use `Solutions/Posts.sln/Posts.sln` (note the nested directory)
+- **Solution Location**: Use `Solutions/Posts.sln/Posts.sln` (note the nested directory structure)
 - **Integration Tests**: Require Docker for Testcontainers PostgreSQL
 - **Test Categories**: Use `[Trait("Category", "Integration")]` for database tests
 - **Database**: PostgreSQL with Entity Framework migrations
 
 ### Database Operations
 - **Connection**: PostgreSQL via Npgsql (`docker-compose.yaml` provides dev database)
-- **Migrations**: Run from Infrastructure project: `dotnet ef migrations add {Name} --project App/Posts/Infrastructure`
+- **Migrations**: Run from Infrastructure project: `dotnet ef migrations add {Name} --project . --startup-project ../Api`
+- **Database Update**: `dotnet ef database update --project . --startup-project ../Api`
 - **Test Database**: Automatically managed by PostgresServerFixture with seeded test data
 
 ## Entity & Repository Patterns
@@ -54,20 +56,24 @@ public class PostEntity  // Always suffix with "Entity"
 }
 ```
 
-### Repository Interface Pattern
+### Repository Pattern Implementation
 ```csharp
-public interface IPostRepository
+public class PostRepository(DataContext dataContext) : IPostRepository
 {
-    Task<PostEntity> AddAsync(PostEntity post);  // Async with SaveChanges
-    void Add(PostEntity post);                   // Sync without SaveChanges
-    Task SaveChangesAsync();                     // Explicit save method
+    // Async operations include SaveChanges
+    public async Task<PostEntity> AddAsync(PostEntity post) { /* Add + SaveChanges */ }
+    
+    // Sync operations require manual SaveChanges call
+    public void Add(PostEntity post) => _dataContext.Posts.Add(post);
+    public async Task SaveChangesAsync() => await _dataContext.SaveChangesAsync();
 }
 ```
 
-### EF Configuration
+### EF Configuration & Validation
 - **Table Mapping**: Explicit in `OnModelCreating` with property constraints
-- **String Fields**: Set `HasMaxLength()` for required strings
+- **String Fields**: Set `HasMaxLength()` for required strings (matches FluentValidation rules)
 - **Required Fields**: Use `.IsRequired()` even when entity has `null!`
+- **Validation**: FluentValidation in Application layer matches EF constraints (e.g., 200 char limit)
 
 ## Testing Patterns
 
