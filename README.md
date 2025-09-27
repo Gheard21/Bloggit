@@ -6,6 +6,7 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
 
 - **Clean Architecture**: Strict layer separation with Domain, Application, Infrastructure, and API layers
 - **Vertical Slice Organization**: Each feature (Posts) has its own isolated stack
+- **Multi-Tenant Architecture**: Secure data isolation using JWT claims for tenant identification
 - **Minimal APIs**: Direct endpoint mapping with grouped routes
 - **Entity Framework Core 9**: PostgreSQL database with code-first migrations  
 - **Testcontainers Integration**: Real database testing with Docker
@@ -172,6 +173,26 @@ dotnet test
 
 > **Note:** Integration tests automatically spin up PostgreSQL containers via Testcontainers and seed test data.
 
+#### Multi-Tenant Architecture
+
+The platform implements secure tenant isolation using JWT authentication:
+
+**Tenant Identification:**
+- Uses JWT `NameIdentifier` claim as the tenant identifier
+- Each user operates in their own isolated data space
+- No cross-tenant data access is possible
+
+**Data Isolation:**
+- `AuthorId` field on all entities links data to specific users
+- Repository methods automatically filter by current user
+- API endpoints enforce tenant boundaries at the application level
+
+**Security Benefits:**
+- Users cannot access other users' data (returns 404, not 403)
+- New posts automatically assigned to authenticated user
+- No additional tenant configuration required
+- JWT claims provide the single source of truth for user identity
+
 #### Project Structure
 
 The solution follows Clean Architecture with vertical slices:
@@ -194,15 +215,22 @@ Tests/Posts/
 
 The API provides RESTful endpoints for blog post management under `/api/admin/posts`:
 
-- `GET /api/admin/posts/{postId}` - Retrieve a specific post
-- `POST /api/admin/posts` - Create a new post
-- `PATCH /api/admin/posts/{postId}` - Update an existing post
-- `DELETE /api/admin/posts/{postId}` - Delete a post
+- `GET /api/admin/posts` - Retrieve all posts for the current user
+- `GET /api/admin/posts/{postId}` - Retrieve a specific post (if owned by current user)
+- `POST /api/admin/posts` - Create a new post (automatically assigned to current user)
+- `PATCH /api/admin/posts/{postId}` - Update an existing post (if owned by current user)
+- `DELETE /api/admin/posts/{postId}` - Delete a post (if owned by current user)
 
 **🔒 Authentication Required**: All admin endpoints require a valid JWT token from Auth0. Include the token in the Authorization header:
 ```
 Authorization: Bearer <your-jwt-token>
 ```
+
+**🏢 Multi-Tenant Design**: Each user can only access their own posts. The system automatically:
+- Assigns new posts to the authenticated user (via JWT `NameIdentifier` claim)
+- Filters all queries to show only the current user's data
+- Returns `404 Not Found` when attempting to access another user's posts
+- Provides complete data isolation between tenants
 
 You can test the endpoints using:
 
@@ -236,6 +264,13 @@ You can test the endpoints using:
 - Verify Auth0 configuration is set via user secrets: `dotnet user-secrets list`
 - Check Auth0 domain and audience values match your Auth0 application settings
 - Ensure JWT tokens are valid and not expired when testing manually
+- Verify JWT token includes `NameIdentifier` claim for tenant identification
+
+**Tenant Isolation Issues:**
+- If getting 404 errors for existing posts, ensure JWT token belongs to the post owner
+- Each user sees only their own posts - this is expected behavior, not a bug
+- New posts are automatically assigned to the current user from JWT claims
+- Cross-user data access is intentionally blocked for security
 
 **Dev Container Issues:**
 - Ensure Docker Desktop is running before opening in VS Code

@@ -11,10 +11,11 @@ Domain (Core) -> Application (Use Cases) -> Infrastructure (Data) <- Api (Presen
 ### Key Architectural Patterns
 
 - **Vertical Slice Architecture**: Each feature (Posts) has its own isolated stack
+- **Tenant-Based Architecture**: Multi-tenant design using JWT `NameIdentifier` claim for data isolation
 - **Entity Framework Primary Constructor Pattern**: `DataContext(DbContextOptions<DataContext> options) : DbContext(options)`
 - **Repository with Dual Methods**: Both async (`AddAsync`) and sync (`Add`) versions for different usage patterns
 - **Testcontainers Integration**: Real PostgreSQL database for integration tests
-- **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`)
+- **Minimal APIs**: Direct endpoint mapping in `Program.js` with grouped routes (`/api/admin/posts`)
 - **Auth0 JWT Authentication**: Group-level authorization with `.RequireAuthorization()` on admin endpoints
 
 ## Project Structure & Naming
@@ -57,7 +58,7 @@ Example: `Bloggit.App.Posts.Infrastructure.Repositories`
 public class PostEntity  // Always suffix with "Entity"
 {
     public Guid Id { get; set; }
-    public string AuthorId { get; set; } = null!;  // Required strings use null!
+    public string AuthorId { get; set; } = null!;  // Tenant identifier from JWT NameIdentifier
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;  // Default values
 }
 ```
@@ -68,6 +69,10 @@ public class PostRepository(DataContext dataContext) : IPostRepository
 {
     // Async operations include SaveChanges
     public async Task<PostEntity> AddAsync(PostEntity post) { /* Add + SaveChanges */ }
+    
+    // Tenant-aware methods for data isolation
+    public async Task<PostEntity?> GetByIdAndAuthorAsync(Guid id, string authorId) { /* Filter by author */ }
+    public async Task<IEnumerable<PostEntity>> GetByAuthorAsync(string authorId) { /* Get user's posts */ }
     
     // Sync operations require manual SaveChanges call
     public void Add(PostEntity post) => _dataContext.Posts.Add(post);
@@ -127,6 +132,45 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture)
 - Use primary constructor to inject fixture
 - Call `CreateContext()` within `await using` blocks
 - Tests automatically have seeded data available
+
+## Tenant-Based Architecture
+
+### User Context Service Pattern
+The platform implements multi-tenant data isolation using JWT claims:
+
+```csharp
+public interface IUserContextService
+{
+    string? GetCurrentUserId(); // Extracts NameIdentifier from JWT claims
+}
+
+public class UserContextService(IHttpContextAccessor httpContextAccessor) : IUserContextService
+{
+    public string? GetCurrentUserId()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        return user?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    }
+}
+```
+
+### Tenant Data Isolation
+- **AuthorId Field**: Every entity includes `AuthorId` populated from JWT `NameIdentifier` claim
+- **Repository Filtering**: All queries filter by current user's ID for data isolation
+- **Automatic Population**: `PostMappings.ToEntity()` requires `IUserContextService` to set AuthorId
+- **API Endpoints**: All operations scope to current user's data only
+
+### Tenant-Aware API Endpoints
+```csharp
+posts.MapGet("", async (IPostRepository repo, IUserContextService userContext) =>
+{
+    var userId = userContext.GetCurrentUserId();
+    if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
+    
+    var posts = await repo.GetByAuthorAsync(userId);
+    return Results.Ok(posts.Select(p => p.ToResponse()));
+});
+```
 
 ## Authentication & Authorization
 
