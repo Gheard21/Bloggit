@@ -5,10 +5,34 @@ using Bloggit.App.Posts.Domain.Interfaces;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.App.Posts.Infrastructure.Repositories;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Auth0:Authority"];
+        options.Audience = builder.Configuration["Auth0:Audience"];
+        
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveToken = true;
+        
+        // Optional: Add token validation parameters
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+// Add authorization services
+builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<DataContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -30,7 +54,10 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsEnvironment("Testing"))
     app.UseHttpsRedirection();
 
-var posts = app.MapGroup("/api/admin/posts");
+app.UseAuthentication();
+app.UseAuthorization();
+
+var posts = app.MapGroup("/api/admin/posts").RequireAuthorization();
 
 posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
 {

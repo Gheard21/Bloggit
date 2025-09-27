@@ -10,6 +10,7 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
 - **Entity Framework Core 9**: PostgreSQL database with code-first migrations  
 - **Testcontainers Integration**: Real database testing with Docker
 - **FluentValidation**: Request validation matching EF constraints
+- **Auth0 JWT Authentication**: Secure API endpoints with JWT token validation
 - **Primary Constructor Pattern**: Modern C# 12 syntax throughout
 
 ## Local Development Setup
@@ -40,7 +41,15 @@ The easiest way to get started is using the provided dev container configuration
    - When prompted, click "Reopen in Container"
    - Or use Command Palette: `Dev Containers: Reopen in Container`
 
-3. **Start Development**
+3. **Configure Authentication** (one-time setup)
+   ```bash
+   # Set up Auth0 configuration via user secrets
+   cd App/Posts/Api
+   dotnet user-secrets set "Auth0:Authority" "https://your-auth0-domain.auth0.com/"
+   dotnet user-secrets set "Auth0:Audience" "https://your-api-identifier"
+   ```
+
+4. **Start Development**
    ```bash
    # Database is already running in the container
    # Connection string is pre-configured via environment variables
@@ -52,7 +61,7 @@ The easiest way to get started is using the provided dev container configuration
    dotnet run --project App/Posts/Api
    ```
    
-   **Note:** No manual database setup or connection string configuration needed! Everything is pre-configured in the dev container.
+   **Note:** Database setup is automatic in dev containers, but Auth0 configuration needs to be set once per container.
 
 The dev container includes:
 - ✅ .NET 9 SDK pre-installed
@@ -82,16 +91,18 @@ The dev container includes:
    POSTGRES_DB=bloggitdb
    ```
 
-3. **Configure API Database Connection**
+3. **Configure API Database Connection and Authentication**
    
-   Set up the database connection string as a user secret:
+   Set up the database connection string and Auth0 configuration as user secrets:
    ```bash
    cd App/Posts/Api
    dotnet user-secrets init
    dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=bloggitdb;Username=bloggit;Password=your_secure_password"
+   dotnet user-secrets set "Auth0:Authority" "https://your-auth0-domain.auth0.com/"
+   dotnet user-secrets set "Auth0:Audience" "https://your-api-identifier"
    ```
    
-   > **Note:** Replace `your_secure_password` with the same password you used in the `.env` file above.
+   > **Note:** Replace `your_secure_password` with the same password you used in the `.env` file above, and replace the Auth0 values with your actual Auth0 tenant configuration.
 
 4. **Start the Database**
    ```bash
@@ -188,6 +199,11 @@ The API provides RESTful endpoints for blog post management under `/api/admin/po
 - `PATCH /api/admin/posts/{postId}` - Update an existing post
 - `DELETE /api/admin/posts/{postId}` - Delete a post
 
+**🔒 Authentication Required**: All admin endpoints require a valid JWT token from Auth0. Include the token in the Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
+```
+
 You can test the endpoints using:
 
 - **HTTP Client**: Use the VS Code REST Client extension (sample requests in `Bloggit.App.Posts.Api.http`)
@@ -215,6 +231,11 @@ You can test the endpoints using:
 **Integration Test Issues:**
 - Ensure Docker Desktop is running (required for Testcontainers)
 - Tests may take longer on first run while downloading PostgreSQL image
+
+**Authentication Issues:**
+- Verify Auth0 configuration is set via user secrets: `dotnet user-secrets list`
+- Check Auth0 domain and audience values match your Auth0 application settings
+- Ensure JWT tokens are valid and not expired when testing manually
 
 **Dev Container Issues:**
 - Ensure Docker Desktop is running before opening in VS Code

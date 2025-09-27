@@ -15,6 +15,7 @@ Domain (Core) -> Application (Use Cases) -> Infrastructure (Data) <- Api (Presen
 - **Repository with Dual Methods**: Both async (`AddAsync`) and sync (`Add`) versions for different usage patterns
 - **Testcontainers Integration**: Real PostgreSQL database for integration tests
 - **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`)
+- **Auth0 JWT Authentication**: Group-level authorization with `.RequireAuthorization()` on admin endpoints
 
 ## Project Structure & Naming
 
@@ -126,6 +127,41 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture)
 - Use primary constructor to inject fixture
 - Call `CreateContext()` within `await using` blocks
 - Tests automatically have seeded data available
+
+## Authentication & Authorization
+
+### Auth0 JWT Configuration
+- **Group-Level Protection**: All `/api/admin/posts` endpoints protected via `.RequireAuthorization()`
+- **Configuration-Based**: Auth0 Authority and Audience configured via `appsettings.json`
+- **Enhanced Security**: Custom token validation parameters with zero clock skew
+- **Environment Aware**: HTTPS metadata validation disabled in development
+
+### Authentication Setup Pattern
+```csharp
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Auth0:Authority"];
+        options.Audience = builder.Configuration["Auth0:Audience"];
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+var posts = app.MapGroup("/api/admin/posts").RequireAuthorization(); // Protects all endpoints
+```
+
+### Test Authentication Bypass
+- **TestAuthenticationHandler**: Custom handler that bypasses Auth0 for integration tests
+- **Environment Detection**: Uses "Testing" environment to trigger test authentication
+- **Fake Claims**: Generates test user claims (NameIdentifier, Name, Email)
+- **Authorization Preserved**: Endpoints still require authorization but always pass in tests
 
 ## Dev Container Configuration
 

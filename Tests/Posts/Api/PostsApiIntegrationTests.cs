@@ -5,6 +5,7 @@ using Bloggit.App.Posts.Application.Requests;
 using Bloggit.App.Posts.Application.Responses;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.Tests.Posts.Shared;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -27,8 +28,20 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
+                // Configure test environment to disable HTTPS redirection
+                builder.UseEnvironment("Testing");
+                
                 builder.ConfigureServices(services =>
                 {
+                    // Replace authentication with test authentication
+                    services.RemoveAll<IAuthenticationSchemeProvider>();
+                    services.AddAuthentication("Test")
+                        .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                            "Test", options => { });
+                    
+                    // Ensure authorization is still configured
+                    services.AddAuthorization();
+                    
                     // Remove the existing DataContext registration
                     services.RemoveAll<DataContext>();
                     services.RemoveAll<DbContextOptions<DataContext>>();
@@ -37,9 +50,6 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
                     services.AddDbContext<DataContext>(options =>
                         options.UseNpgsql(_fixture.ConnectionString));
                 });
-                
-                // Configure test environment to disable HTTPS redirection
-                builder.UseEnvironment("Testing");
             });
     }
 
