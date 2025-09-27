@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Bloggit.App.Posts.Application.Requests;
 using Bloggit.App.Posts.Application.Responses;
+using Bloggit.App.Posts.Domain.Entities;
+using Bloggit.App.Posts.Domain.Interfaces;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.Tests.Posts.Shared;
 using Microsoft.AspNetCore.Authentication;
@@ -60,9 +62,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Use a post that belongs to the test user
-        await using var context = CreateContext();
-        var userPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
+        // Use repository to get a post that belongs to the test user
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var userPosts = await repository.GetByAuthorAsync("test-user-id");
+        var userPost = userPosts.First();
 
         // Act
         var response = await client.GetAsync($"/api/admin/posts/{userPost.Id}");
@@ -103,9 +107,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Use a post that belongs to another user
-        await using var context = CreateContext();
-        var otherUserPost = await context.Posts.FirstAsync(p => p.AuthorId != "test-user-id");
+        // Use repository to get a post that belongs to another user
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var otherUserPosts = await repository.GetByAuthorAsync("other-user-1");
+        var otherUserPost = otherUserPosts.First();
 
         // Act
         var response = await client.GetAsync($"/api/admin/posts/{otherUserPost.Id}");
@@ -178,9 +184,10 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         // Verify the Location header
         Assert.True(response.Headers.Location?.ToString().Contains($"/api/admin/posts/{postResponse.Id}"));
 
-        // Verify the post was actually created in the database with correct AuthorId
-        await using var context = CreateContext();
-        var createdPost = await context.Posts.FindAsync(postResponse.Id);
+        // Verify the post was actually created with correct AuthorId using fresh repository instance
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyRepository = verifyScope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var createdPost = await verifyRepository.GetByIdAndAuthorAsync(postResponse.Id, "test-user-id");
         Assert.NotNull(createdPost);
         Assert.Equal(request.Title, createdPost.Title);
         Assert.Equal(request.Content, createdPost.Content);
@@ -251,9 +258,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Get a post that belongs to the test user
-        await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
+        // Get a post that belongs to the test user using repository
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var userPosts = await repository.GetByAuthorAsync("test-user-id");
+        var existingPost = userPosts.First();
         
         var request = new UpdatePostRequest
         {
@@ -268,9 +277,10 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        // Verify the post was actually updated in the database
-        await using var verifyContext = CreateContext();
-        var updatedPost = await verifyContext.Posts.FindAsync(existingPost.Id);
+        // Verify the post was actually updated using a fresh repository instance
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyRepository = verifyScope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var updatedPost = await verifyRepository.GetByIdAndAuthorAsync(existingPost.Id, "test-user-id");
         Assert.NotNull(updatedPost);
         Assert.Equal(request.Title, updatedPost.Title);
         Assert.Equal(request.Content, updatedPost.Content);
@@ -285,9 +295,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Get a post that belongs to another user
-        await using var context = CreateContext();
-        var otherUserPost = await context.Posts.FirstAsync(p => p.AuthorId != "test-user-id");
+        // Get a post that belongs to another user using repository
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var otherUserPosts = await repository.GetByAuthorAsync("other-user-1");
+        var otherUserPost = otherUserPosts.First();
         
         var request = new UpdatePostRequest
         {
@@ -302,9 +314,10 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         
-        // Verify the post was NOT updated in the database
-        await using var verifyContext = CreateContext();
-        var unchangedPost = await verifyContext.Posts.FindAsync(otherUserPost.Id);
+        // Verify the post was NOT updated using a fresh repository instance
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyRepository = verifyScope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var unchangedPost = await verifyRepository.GetByIdAndAuthorAsync(otherUserPost.Id, "other-user-1");
         Assert.NotNull(unchangedPost);
         Assert.Equal(otherUserPost.Title, unchangedPost.Title); // Should remain unchanged
         Assert.Equal(otherUserPost.Content, unchangedPost.Content); // Should remain unchanged
@@ -339,8 +352,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
+        // Get a post that belongs to the test user using repository
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var userPosts = await repository.GetByAuthorAsync("test-user-id");
+        var existingPost = userPosts.First();
         
         var request = new UpdatePostRequest
         {
@@ -363,8 +379,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
+        // Get a post that belongs to the test user using repository
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var userPosts = await repository.GetByAuthorAsync("test-user-id");
+        var existingPost = userPosts.First();
         
         var request = new UpdatePostRequest
         {
@@ -387,8 +406,11 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
+        // Get a post that belongs to the test user using repository
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+        var userPosts = await repository.GetByAuthorAsync("test-user-id");
+        var existingPost = userPosts.First();
         
         var request = new UpdatePostRequest
         {
@@ -509,11 +531,12 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         var uniqueIds = createdPosts.Select(p => p.Id).Distinct().ToList();
         Assert.Equal(3, uniqueIds.Count);
         
-        // Verify all posts exist in database with correct AuthorId
-        await using var context = CreateContext();
+        // Verify all posts exist with correct AuthorId using fresh repository instance
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyRepository = verifyScope.ServiceProvider.GetRequiredService<IPostRepository>();
         foreach (var createdPost in createdPosts)
         {
-            var dbPost = await context.Posts.FindAsync(createdPost.Id);
+            var dbPost = await verifyRepository.GetByIdAndAuthorAsync(createdPost.Id, "test-user-id");
             Assert.NotNull(dbPost);
             Assert.Equal(createdPost.Title, dbPost.Title);
             Assert.Equal(createdPost.Content, dbPost.Content);
