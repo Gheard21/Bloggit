@@ -15,7 +15,7 @@ Domain (Core) -> Application (Use Cases) -> Infrastructure (Data) <- Api (Presen
 - **Entity Framework Primary Constructor Pattern**: `DataContext(DbContextOptions<DataContext> options) : DbContext(options)`
 - **Repository with Dual Methods**: Both async (`AddAsync`) and sync (`Add`) versions for different usage patterns
 - **Testcontainers Integration**: Real PostgreSQL database for integration tests
-- **Minimal APIs**: Direct endpoint mapping in `Program.js` with grouped routes (`/api/admin/posts`)
+- **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`)
 - **Auth0 JWT Authentication**: Group-level authorization with `.RequireAuthorization()` on admin endpoints
 
 ## Project Structure & Naming
@@ -95,11 +95,21 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture)
     : IClassFixture<PostgresServerFixture>
 {
     // Primary constructor pattern for test classes
+    // Repository tests use real database via Testcontainers
+}
+
+[Trait("Category", "Integration")]
+public class PostApiIntegrationTests(PostgresServerFixture fixture) 
+    : IClassFixture<PostgresServerFixture>
+{
+    // API integration tests use real repositories and database
+    // This ensures full integration testing of the entire stack
 }
 ```
 
 ### Test Database Management
-- **Fixture**: `PostgresServerFixture` handles container lifecycle
+- **Fixture**: `PostgresServerFixture` handles container lifecycle for all test types
+- **Real Dependencies**: API integration tests use actual repositories and database
 - **Seeding**: Automatic test data seeding in fixture initialization
 - **Isolation**: Each test uses `CreateContext()` for clean state
 

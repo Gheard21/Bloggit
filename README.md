@@ -171,7 +171,7 @@ dotnet test --filter "Category=Integration"
 dotnet test
 ```
 
-> **Note:** Integration tests automatically spin up PostgreSQL containers via Testcontainers and seed test data.
+> **Note:** Integration tests use Testcontainers to spin up real PostgreSQL instances. API tests exercise the full stack including real repositories and database interactions for comprehensive testing.
 
 #### Multi-Tenant Architecture
 
