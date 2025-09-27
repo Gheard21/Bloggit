@@ -42,39 +42,41 @@ public class PostgresServerFixture : IAsyncLifetime
     {
         await context.Posts.AddRangeAsync(
         [
+            // Posts for the test user (test-user-id)
             new PostEntity
             {
-                Title = "Test Post 1",
-                Content = "This is the content of test post 1.",
-                AuthorId = "Author 1",
+                Title = "Test User Post 1",
+                Content = "This is the content of test user post 1.",
+                AuthorId = "test-user-id",
+                DateCreated = DateTime.UtcNow.AddDays(-2)
+            },
+            new PostEntity
+            {
+                Title = "Test User Post 2", 
+                Content = "This is the content of test user post 2.",
+                AuthorId = "test-user-id",
+                DateCreated = DateTime.UtcNow.AddDays(-1)
+            },
+            // Posts for other users (to test tenant isolation)
+            new PostEntity
+            {
+                Title = "Other User Post 1",
+                Content = "This is the content of other user post 1.",
+                AuthorId = "other-user-1",
                 DateCreated = DateTime.UtcNow
             },
             new PostEntity
             {
-                Title = "Test Post 2",
-                Content = "This is the content of test post 2.",
-                AuthorId = "Author 2",
+                Title = "Other User Post 2",
+                Content = "This is the content of other user post 2.",
+                AuthorId = "other-user-2",
                 DateCreated = DateTime.UtcNow
             },
             new PostEntity
             {
-                Title = "Test Post 3",
-                Content = "This is the content of test post 3.",
-                AuthorId = "Author 3",
-                DateCreated = DateTime.UtcNow
-            },
-            new PostEntity
-            {
-                Title = "Test Post 4",
-                Content = "This is the content of test post 4.",
-                AuthorId = "Author 4",
-                DateCreated = DateTime.UtcNow
-            },
-            new PostEntity
-            {
-                Title = "Test Post 5",
-                Content = "This is the content of test post 5.",
-                AuthorId = "Author 5",
+                Title = "Other User Post 3",
+                Content = "This is the content of other user post 3.",
+                AuthorId = "other-user-3",
                 DateCreated = DateTime.UtcNow
             }
         ]);

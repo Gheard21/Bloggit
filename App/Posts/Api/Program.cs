@@ -1,9 +1,11 @@
+using Bloggit.App.Posts.Application.Interfaces;
 using Bloggit.App.Posts.Application.Mappings;
 using Bloggit.App.Posts.Application.Requests;
 using Bloggit.App.Posts.Application.Validators;
 using Bloggit.App.Posts.Domain.Interfaces;
 using Bloggit.App.Posts.Infrastructure;
 using Bloggit.App.Posts.Infrastructure.Repositories;
+using Bloggit.App.Posts.Infrastructure.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +39,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddDbContext<DataContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IPostRepository, PostRepository>();
 
 builder.Services.AddScoped<IValidator<NewPostRequest>, NewPostRequestValidator>();
@@ -59,9 +63,13 @@ app.UseAuthorization();
 
 var posts = app.MapGroup("/api/admin/posts").RequireAuthorization();
 
-posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
+posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postRepository, IUserContextService userContextService) =>
 {
-    var post = await postRepository.GetByIdAsync(postId);
+    var currentUserId = userContextService.GetCurrentUserId();
+    if (string.IsNullOrEmpty(currentUserId))
+        return Results.Unauthorized();
+
+    var post = await postRepository.GetByIdAndAuthorAsync(postId, currentUserId);
 
     if (post is null)
         return Results.NotFound();
@@ -73,9 +81,26 @@ posts.MapDelete("{postId:guid}", async (Guid postId, IPostRepository postReposit
 })
 .WithName("DeletePost");
 
-posts.MapGet("{postId:guid}", async (Guid postId, IPostRepository postRepository) =>
+posts.MapGet("", async (IPostRepository postRepository, IUserContextService userContextService) =>
 {
-    var post = await postRepository.GetByIdAsync(postId);
+    var currentUserId = userContextService.GetCurrentUserId();
+    if (string.IsNullOrEmpty(currentUserId))
+        return Results.Unauthorized();
+
+    var posts = await postRepository.GetByAuthorAsync(currentUserId);
+    var responses = posts.Select(p => p.ToResponse()).ToArray();
+
+    return Results.Ok(responses);
+})
+.WithName("GetPosts");
+
+posts.MapGet("{postId:guid}", async (Guid postId, IPostRepository postRepository, IUserContextService userContextService) =>
+{
+    var currentUserId = userContextService.GetCurrentUserId();
+    if (string.IsNullOrEmpty(currentUserId))
+        return Results.Unauthorized();
+
+    var post = await postRepository.GetByIdAndAuthorAsync(postId, currentUserId);
 
     if (post is null)
         return Results.NotFound();
@@ -86,14 +111,14 @@ posts.MapGet("{postId:guid}", async (Guid postId, IPostRepository postRepository
 })
 .WithName("GetPost");
 
-posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository postRepository, IValidator<NewPostRequest> validator) =>
+posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository postRepository, IValidator<NewPostRequest> validator, IUserContextService userContextService) =>
 {
     var validationResult = await validator.ValidateAsync(request);
 
     if (!validationResult.IsValid)
         return Results.BadRequest();
 
-    var entity = request.ToEntity();
+    var entity = request.ToEntity(userContextService);
 
     var createdEntity = await postRepository.AddAsync(entity);
 
@@ -103,14 +128,18 @@ posts.MapPost("", async ([FromBody] NewPostRequest request, IPostRepository post
 })
 .WithName("CreatePost");
 
-posts.MapPatch("{postId:guid}", async (Guid postId, [FromBody] UpdatePostRequest request, IPostRepository postRepository, IValidator<UpdatePostRequest> validator) =>
+posts.MapPatch("{postId:guid}", async (Guid postId, [FromBody] UpdatePostRequest request, IPostRepository postRepository, IValidator<UpdatePostRequest> validator, IUserContextService userContextService) =>
 {
     var validationResult = await validator.ValidateAsync(request);
 
     if (!validationResult.IsValid)
         return Results.BadRequest();
 
-    var existingPost = await postRepository.GetByIdAsync(postId);
+    var currentUserId = userContextService.GetCurrentUserId();
+    if (string.IsNullOrEmpty(currentUserId))
+        return Results.Unauthorized();
+
+    var existingPost = await postRepository.GetByIdAndAuthorAsync(postId, currentUserId);
 
     if (existingPost is null)
         return Results.NotFound();

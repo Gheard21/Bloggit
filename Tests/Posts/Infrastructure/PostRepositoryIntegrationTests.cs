@@ -256,6 +256,127 @@ public class PostRepositoryIntegrationTests(PostgresServerFixture fixture) : ICl
         Assert.Equal("Second Post", savedPost2.Title);
     }
 
+    [Fact]
+    public async Task GetByIdAndAuthorAsync_ShouldReturnPost_WhenUserOwnsPost()
+    {
+        // Arrange
+        await using var context = CreateContext();
+        var repository = new PostRepository(context);
+        var authorId = "test-author-123";
+        
+        var post = new PostEntity
+        {
+            Title = "User's Post",
+            Content = "This post belongs to the user",
+            AuthorId = authorId,
+            DateCreated = DateTime.UtcNow
+        };
+        
+        context.Posts.Add(post);
+        await context.SaveChangesAsync();
+
+        // Act
+        var result = await repository.GetByIdAndAuthorAsync(post.Id, authorId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("User's Post", result.Title);
+        Assert.Equal(authorId, result.AuthorId);
+    }
+
+    [Fact]
+    public async Task GetByIdAndAuthorAsync_ShouldReturnNull_WhenUserDoesNotOwnPost()
+    {
+        // Arrange
+        await using var context = CreateContext();
+        var repository = new PostRepository(context);
+        var originalAuthorId = "original-author";
+        var differentAuthorId = "different-author";
+        
+        var post = new PostEntity
+        {
+            Title = "Someone Else's Post",
+            Content = "This post belongs to another user",
+            AuthorId = originalAuthorId,
+            DateCreated = DateTime.UtcNow
+        };
+        
+        context.Posts.Add(post);
+        await context.SaveChangesAsync();
+
+        // Act
+        var result = await repository.GetByIdAndAuthorAsync(post.Id, differentAuthorId);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByAuthorAsync_ShouldReturnOnlyUsersPosts()
+    {
+        // Arrange
+        await using var context = CreateContext();
+        var repository = new PostRepository(context);
+        var userAuthorId = "target-user";
+        var otherAuthorId = "other-user";
+        
+        // Create posts for target user
+        var userPost1 = new PostEntity
+        {
+            Title = "User Post 1",
+            Content = "Content 1",
+            AuthorId = userAuthorId,
+            DateCreated = DateTime.UtcNow.AddMinutes(-10)
+        };
+        
+        var userPost2 = new PostEntity
+        {
+            Title = "User Post 2", 
+            Content = "Content 2",
+            AuthorId = userAuthorId,
+            DateCreated = DateTime.UtcNow.AddMinutes(-5)
+        };
+        
+        // Create post for different user
+        var otherUserPost = new PostEntity
+        {
+            Title = "Other User Post",
+            Content = "Other content",
+            AuthorId = otherAuthorId,
+            DateCreated = DateTime.UtcNow
+        };
+        
+        context.Posts.AddRange(userPost1, userPost2, otherUserPost);
+        await context.SaveChangesAsync();
+
+        // Act
+        var result = await repository.GetByAuthorAsync(userAuthorId);
+        var resultList = result.ToList();
+
+        // Assert
+        Assert.Equal(2, resultList.Count);
+        Assert.All(resultList, post => Assert.Equal(userAuthorId, post.AuthorId));
+        
+        // Verify ordering (newest first)
+        Assert.Equal("User Post 2", resultList[0].Title);
+        Assert.Equal("User Post 1", resultList[1].Title);
+    }
+
+    [Fact]
+    public async Task GetByAuthorAsync_ShouldReturnEmptyList_WhenUserHasNoPosts()
+    {
+        // Arrange
+        await using var context = CreateContext();
+        var repository = new PostRepository(context);
+        var userWithNoPosts = "user-with-no-posts";
+
+        // Act
+        var result = await repository.GetByAuthorAsync(userWithNoPosts);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
     private DataContext CreateContext()
     {
         return new DataContext(new DbContextOptionsBuilder<DataContext>()

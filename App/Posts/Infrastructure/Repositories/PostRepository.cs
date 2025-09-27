@@ -1,5 +1,6 @@
 using Bloggit.App.Posts.Domain.Entities;
 using Bloggit.App.Posts.Domain.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bloggit.App.Posts.Infrastructure.Repositories;
 
@@ -28,6 +29,16 @@ public class PostRepository(DataContext dataContext) : IPostRepository
 
     public async Task<PostEntity?> GetByIdAsync(Guid id) =>
         await _dataContext.Posts.FindAsync(id);
+
+    public async Task<PostEntity?> GetByIdAndAuthorAsync(Guid id, string authorId) =>
+        await _dataContext.Posts
+            .FirstOrDefaultAsync(p => p.Id == id && p.AuthorId == authorId);
+
+    public async Task<IEnumerable<PostEntity>> GetByAuthorAsync(string authorId) =>
+        await _dataContext.Posts
+            .Where(p => p.AuthorId == authorId)
+            .OrderByDescending(p => p.DateCreated)
+            .ToListAsync();
 
     public void Update(PostEntity updatedPost)
         => _dataContext.Posts.Update(updatedPost);

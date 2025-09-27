@@ -9,6 +9,8 @@ public interface IPostRepository
     Task Delete(PostEntity post);
     void Remove(PostEntity post);
     Task<PostEntity?> GetByIdAsync(Guid id);
+    Task<PostEntity?> GetByIdAndAuthorAsync(Guid id, string authorId);
+    Task<IEnumerable<PostEntity>> GetByAuthorAsync(string authorId);
     void Update(PostEntity updatedPost);
     Task SaveChangesAsync();
 }

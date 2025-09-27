@@ -54,18 +54,18 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
     }
 
     [Fact]
-    public async Task GetPost_ShouldReturn200_WhenPostExists()
+    public async Task GetPost_ShouldReturn200_WhenPostExistsAndUserOwnsIt()
     {
         // Arrange
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Use the first seeded post ID
+        // Use a post that belongs to the test user
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var userPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
 
         // Act
-        var response = await client.GetAsync($"/api/admin/posts/{existingPost.Id}");
+        var response = await client.GetAsync($"/api/admin/posts/{userPost.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -76,9 +76,9 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         });
         
         Assert.NotNull(postResponse);
-        Assert.Equal(existingPost.Id, postResponse.Id);
-        Assert.Equal(existingPost.Title, postResponse.Title);
-        Assert.Equal(existingPost.Content, postResponse.Content);
+        Assert.Equal(userPost.Id, postResponse.Id);
+        Assert.Equal(userPost.Title, postResponse.Title);
+        Assert.Equal(userPost.Content, postResponse.Content);
     }
 
     [Fact]
@@ -94,6 +94,56 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetPost_ShouldReturn404_WhenPostExistsButUserDoesNotOwnIt()
+    {
+        // Arrange
+        using var factory = CreateFactory();
+        var client = factory.CreateClient();
+        
+        // Use a post that belongs to another user
+        await using var context = CreateContext();
+        var otherUserPost = await context.Posts.FirstAsync(p => p.AuthorId != "test-user-id");
+
+        // Act
+        var response = await client.GetAsync($"/api/admin/posts/{otherUserPost.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllPosts_ShouldReturnOnlyUsersPosts()
+    {
+        // Arrange
+        using var factory = CreateFactory();
+        var client = factory.CreateClient();
+
+        // Act
+        var response = await client.GetAsync("/api/admin/posts");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var posts = await response.Content.ReadFromJsonAsync<PostResponse[]>(new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+        
+        Assert.NotNull(posts);
+        
+        // Should only return posts belonging to test-user-id
+        Assert.Equal(2, posts.Length); // We seeded 2 posts for test-user-id
+        Assert.All(posts, post => 
+        {
+            Assert.StartsWith("Test User Post", post.Title);
+        });
+        
+        // Verify ordering (newest first)
+        Assert.Equal("Test User Post 2", posts[0].Title);
+        Assert.Equal("Test User Post 1", posts[1].Title);
     }
 
     [Fact]
@@ -128,12 +178,13 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         // Verify the Location header
         Assert.True(response.Headers.Location?.ToString().Contains($"/api/admin/posts/{postResponse.Id}"));
 
-        // Verify the post was actually created in the database
+        // Verify the post was actually created in the database with correct AuthorId
         await using var context = CreateContext();
         var createdPost = await context.Posts.FindAsync(postResponse.Id);
         Assert.NotNull(createdPost);
         Assert.Equal(request.Title, createdPost.Title);
         Assert.Equal(request.Content, createdPost.Content);
+        Assert.Equal("test-user-id", createdPost.AuthorId); // Verify tenant isolation
     }
 
     [Fact]
@@ -194,15 +245,15 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
     }
 
     [Fact]
-    public async Task UpdatePost_ShouldReturn200_WhenValidRequest()
+    public async Task UpdatePost_ShouldReturn200_WhenValidRequestAndUserOwnsPost()
     {
         // Arrange
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Get an existing post
+        // Get a post that belongs to the test user
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
         
         var request = new UpdatePostRequest
         {
@@ -225,6 +276,38 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         Assert.Equal(request.Content, updatedPost.Content);
         Assert.Equal(existingPost.DateCreated, updatedPost.DateCreated); // Should not change
         Assert.Equal(existingPost.AuthorId, updatedPost.AuthorId); // Should not change
+    }
+
+    [Fact]
+    public async Task UpdatePost_ShouldReturn404_WhenPostExistsButUserDoesNotOwnIt()
+    {
+        // Arrange
+        using var factory = CreateFactory();
+        var client = factory.CreateClient();
+        
+        // Get a post that belongs to another user
+        await using var context = CreateContext();
+        var otherUserPost = await context.Posts.FirstAsync(p => p.AuthorId != "test-user-id");
+        
+        var request = new UpdatePostRequest
+        {
+            Id = otherUserPost.Id,
+            Title = "Updated Title",
+            Content = "Updated Content"
+        };
+
+        // Act
+        var response = await client.PatchAsJsonAsync($"/api/admin/posts/{otherUserPost.Id}", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        
+        // Verify the post was NOT updated in the database
+        await using var verifyContext = CreateContext();
+        var unchangedPost = await verifyContext.Posts.FindAsync(otherUserPost.Id);
+        Assert.NotNull(unchangedPost);
+        Assert.Equal(otherUserPost.Title, unchangedPost.Title); // Should remain unchanged
+        Assert.Equal(otherUserPost.Content, unchangedPost.Content); // Should remain unchanged
     }
 
     [Fact]
@@ -257,7 +340,7 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         var client = factory.CreateClient();
         
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
         
         var request = new UpdatePostRequest
         {
@@ -281,7 +364,7 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         var client = factory.CreateClient();
         
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
         
         var request = new UpdatePostRequest
         {
@@ -305,7 +388,7 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         var client = factory.CreateClient();
         
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
         
         var request = new UpdatePostRequest
         {
@@ -322,15 +405,15 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
     }
 
     [Fact]
-    public async Task DeletePost_ShouldReturn204_WhenPostExists()
+    public async Task DeletePost_ShouldReturn204_WhenPostExistsAndUserOwnsIt()
     {
         // Arrange
         using var factory = CreateFactory();
         var client = factory.CreateClient();
         
-        // Create a post to delete
+        // Use a post that belongs to the test user
         await using var context = CreateContext();
-        var existingPost = await context.Posts.FirstAsync();
+        var existingPost = await context.Posts.FirstAsync(p => p.AuthorId == "test-user-id");
 
         // Act
         var response = await client.DeleteAsync($"/api/admin/posts/{existingPost.Id}");
@@ -342,6 +425,29 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         await using var verifyContext = CreateContext();
         var deletedPost = await verifyContext.Posts.FindAsync(existingPost.Id);
         Assert.Null(deletedPost);
+    }
+
+    [Fact]
+    public async Task DeletePost_ShouldReturn404_WhenPostExistsButUserDoesNotOwnIt()
+    {
+        // Arrange
+        using var factory = CreateFactory();
+        var client = factory.CreateClient();
+        
+        // Use a post that belongs to another user
+        await using var context = CreateContext();
+        var otherUserPost = await context.Posts.FirstAsync(p => p.AuthorId != "test-user-id");
+
+        // Act
+        var response = await client.DeleteAsync($"/api/admin/posts/{otherUserPost.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        // Verify the post was NOT deleted from the database
+        await using var verifyContext = CreateContext();
+        var stillExistsPost = await verifyContext.Posts.FindAsync(otherUserPost.Id);
+        Assert.NotNull(stillExistsPost);
     }
 
     [Fact]
@@ -403,7 +509,7 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
         var uniqueIds = createdPosts.Select(p => p.Id).Distinct().ToList();
         Assert.Equal(3, uniqueIds.Count);
         
-        // Verify all posts exist in database
+        // Verify all posts exist in database with correct AuthorId
         await using var context = CreateContext();
         foreach (var createdPost in createdPosts)
         {
@@ -411,6 +517,7 @@ public class PostsApiIntegrationTests(PostgresServerFixture fixture)
             Assert.NotNull(dbPost);
             Assert.Equal(createdPost.Title, dbPost.Title);
             Assert.Equal(createdPost.Content, dbPost.Content);
+            Assert.Equal("test-user-id", dbPost.AuthorId); // Verify tenant isolation
         }
     }
 
