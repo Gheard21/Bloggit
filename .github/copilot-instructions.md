@@ -10,12 +10,12 @@ Domain (Core) -> Application (Use Cases) -> Infrastructure (Data) <- Api (Presen
 
 ### Key Architectural Patterns
 
-- **Vertical Slice Architecture**: Each feature (Posts) has its own isolated stack
+- **Vertical Slice Architecture**: Each feature (Posts, Comments) has its own isolated stack
 - **Tenant-Based Architecture**: Multi-tenant design using JWT `NameIdentifier` claim for data isolation
 - **Entity Framework Primary Constructor Pattern**: `DataContext(DbContextOptions<DataContext> options) : DbContext(options)`
 - **Repository with Dual Methods**: Both async (`AddAsync`) and sync (`Add`) versions for different usage patterns
 - **Testcontainers Integration**: Real PostgreSQL database for integration tests
-- **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`)
+- **Minimal APIs**: Direct endpoint mapping in `Program.cs` with grouped routes (`/api/admin/posts`, `/api/admin/comments`)
 - **Auth0 JWT Authentication**: Group-level authorization with `.RequireAuthorization()` on admin endpoints
 
 ## Project Structure & Naming
@@ -30,7 +30,7 @@ Solutions/{FeatureName}.sln/
 ### Namespace Pattern
 `Bloggit.{App|Tests}.{FeatureName}.{Layer}[.SubFolder]`
 
-Example: `Bloggit.App.Posts.Infrastructure.Repositories`
+Example: `Bloggit.App.Posts.Infrastructure.Repositories`, `Bloggit.App.Comments.Domain.Entities`
 
 ## Critical Development Workflows
 
@@ -59,6 +59,15 @@ public class PostEntity  // Always suffix with "Entity"
 {
     public Guid Id { get; set; }
     public string AuthorId { get; set; } = null!;  // Tenant identifier from JWT NameIdentifier
+    public DateTime DateCreated { get; set; } = DateTime.UtcNow;  // Default values
+}
+
+public class CommentEntity  // Comments follow same tenant isolation pattern
+{
+    public Guid Id { get; set; }
+    public string AuthorId { get; set; } = null!;  // Tenant identifier from JWT NameIdentifier
+    public Guid PostId { get; set; } = null!;     // Links comment to specific post
+    public string Content { get; set; } = null!;   // Comment text content
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;  // Default values
 }
 ```
@@ -185,7 +194,7 @@ posts.MapGet("", async (IPostRepository repo, IUserContextService userContext) =
 ## Authentication & Authorization
 
 ### Auth0 JWT Configuration
-- **Group-Level Protection**: All `/api/admin/posts` endpoints protected via `.RequireAuthorization()`
+- **Group-Level Protection**: All `/api/admin/posts` and `/api/admin/comments` endpoints protected via `.RequireAuthorization()`
 - **Configuration-Based**: Auth0 Authority and Audience configured via `appsettings.json`
 - **Enhanced Security**: Custom token validation parameters with zero clock skew
 - **Environment Aware**: HTTPS metadata validation disabled in development

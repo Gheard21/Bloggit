@@ -5,7 +5,7 @@ A modern blogging platform built with .NET 9, implementing Clean Architecture wi
 ## Key Features
 
 - **Clean Architecture**: Strict layer separation with Domain, Application, Infrastructure, and API layers
-- **Vertical Slice Organization**: Each feature (Posts) has its own isolated stack
+- **Vertical Slice Organization**: Each feature (Posts, Comments) has its own isolated stack
 - **Multi-Tenant Architecture**: Secure data isolation using JWT claims for tenant identification
 - **Minimal APIs**: Direct endpoint mapping with grouped routes
 - **Entity Framework Core 9**: PostgreSQL database with code-first migrations  
@@ -189,7 +189,7 @@ The platform implements secure tenant isolation using JWT authentication:
 
 **Security Benefits:**
 - Users cannot access other users' data (returns 404, not 403)
-- New posts automatically assigned to authenticated user
+- New posts and comments automatically assigned to authenticated user
 - No additional tenant configuration required
 - JWT claims provide the single source of truth for user identity
 
@@ -204,33 +204,54 @@ App/Posts/
 ├── Infrastructure/  # Data access and external services
 └── Api/            # Web API endpoints
 
+App/Comments/
+├── Domain/          # Comment entities and interfaces
+├── Application/     # Comment use cases and business logic
+├── Infrastructure/  # Comment data access
+└── Api/            # Comment API endpoints
+
 Tests/Posts/
 ├── Domain/          # Unit tests for domain logic
 ├── Application/     # Unit tests for application services
 ├── Infrastructure/  # Integration tests with real database
 └── Api/            # Integration tests for API endpoints
+
+Tests/Comments/
+├── Domain/          # Unit tests for comment domain logic
+├── Application/     # Unit tests for comment application services
+├── Infrastructure/  # Integration tests for comment repository
+└── Api/            # Integration tests for comment API endpoints
 ```
 
 ### API Usage
 
-The API provides RESTful endpoints for blog post management under `/api/admin/posts`:
+The API provides RESTful endpoints for blog management:
 
+#### Posts Management (`/api/admin/posts`)
 - `GET /api/admin/posts` - Retrieve all posts for the current user
 - `GET /api/admin/posts/{postId}` - Retrieve a specific post (if owned by current user)
 - `POST /api/admin/posts` - Create a new post (automatically assigned to current user)
 - `PATCH /api/admin/posts/{postId}` - Update an existing post (if owned by current user)
 - `DELETE /api/admin/posts/{postId}` - Delete a post (if owned by current user)
 
+#### Comments Management (`/api/admin/comments`)
+- `GET /api/admin/comments?postId={postId}` - Retrieve comments for a specific post (if user owns the post)
+- `GET /api/admin/comments/{commentId}` - Retrieve a specific comment (if owned by current user)
+- `POST /api/admin/comments` - Create a new comment (automatically assigned to current user)
+- `PATCH /api/admin/comments/{commentId}` - Update an existing comment (if owned by current user)
+- `DELETE /api/admin/comments/{commentId}` - Delete a comment (if owned by current user)
+
 **🔒 Authentication Required**: All admin endpoints require a valid JWT token from Auth0. Include the token in the Authorization header:
 ```
 Authorization: Bearer <your-jwt-token>
 ```
 
-**🏢 Multi-Tenant Design**: Each user can only access their own posts. The system automatically:
-- Assigns new posts to the authenticated user (via JWT `NameIdentifier` claim)
+**🏢 Multi-Tenant Design**: Each user can only access their own posts and comments. The system automatically:
+- Assigns new posts and comments to the authenticated user (via JWT `NameIdentifier` claim)
 - Filters all queries to show only the current user's data
-- Returns `404 Not Found` when attempting to access another user's posts
+- Returns `404 Not Found` when attempting to access another user's content
 - Provides complete data isolation between tenants
+- Ensures users can only comment on posts they can access
 
 You can test the endpoints using:
 
@@ -267,9 +288,9 @@ You can test the endpoints using:
 - Verify JWT token includes `NameIdentifier` claim for tenant identification
 
 **Tenant Isolation Issues:**
-- If getting 404 errors for existing posts, ensure JWT token belongs to the post owner
-- Each user sees only their own posts - this is expected behavior, not a bug
-- New posts are automatically assigned to the current user from JWT claims
+- If getting 404 errors for existing content, ensure JWT token belongs to the content owner
+- Each user sees only their own posts and comments - this is expected behavior, not a bug
+- New posts and comments are automatically assigned to the current user from JWT claims
 - Cross-user data access is intentionally blocked for security
 
 **Dev Container Issues:**
